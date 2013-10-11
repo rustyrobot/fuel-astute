@@ -128,28 +128,32 @@ module Astute
     class ParseNodeLogs
       attr_reader :pattern_spec
 
-      def initialize(pattern_spec)
-        @nodes_states = {}
-        @pattern_spec = pattern_spec
+      def initialize
+        @nodes_patterns = {}
+        @pattern_spec = {}
         @pattern_spec['path_prefix'] ||= PATH_PREFIX.to_s
         @pattern_spec['separator'] ||= SEPARATOR.to_s
       end
 
       def progress_calculate(uids_to_calc, nodes)
         nodes_progress = []
+
         uids_to_calc.each do |uid|
           node = nodes.find {|n| n['uid'] == uid}
-          @nodes_states[uid] ||= deep_copy @pattern_spec
-          node_pattern_spec = @nodes_states[uid]
+          node_pattern_spec = @nodes_patterns[uid]
+          # FIXME(eli): this crap is required for binding() below
+          @pattern_spec = @nodes_patterns[uid]
 
           erb_path = node_pattern_spec['path_format']
           path = ERB.new(erb_path).result(binding())
 
+          progress = 0
           begin
-            progress = (get_log_progress(path, node_pattern_spec)*100).to_i # Return percent of progress
+            # Return percent of progress
+            progress = (get_log_progress(path, node_pattern_spec) * 100).to_i
           rescue => e
-            Astute.logger.warn "Some error occurred when calculate progress for node '#{uid}': #{e.message}, trace: #{e.format_backtrace}"
-            progress = 0
+            Astute.logger.warn "Some error occurred when calculate progress " \
+              "for node '#{uid}': #{e.message}, trace: #{e.format_backtrace}"
           end
 
           nodes_progress << {
@@ -157,22 +161,19 @@ module Astute
             'progress' => progress
           }
         end
+
         nodes_progress
       end
 
       def prepare(nodes)
-        @nodes_states = {}
+        # @nodes_patterns = {}
         nodes.each do |node|
           path = "#{@pattern_spec['path_prefix']}#{node['ip']}/#{@pattern_spec['filename']}"
           File.open(path, 'a') {|fo| fo.write @pattern_spec['separator'] } if File.writable?(path)
         end
       end
 
-      def pattern_spec= (pattern_spec)
-        initialise(pattern_spec) # NOTE: bug?
-      end
-
-    private
+      private
 
       def get_log_progress(path, node_pattern_spec)
         unless File.readable?(path)

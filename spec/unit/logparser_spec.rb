@@ -116,7 +116,7 @@ describe LogParser do
       log_delay = 6*time_delta
 
       deploy_parser = Astute::LogParser::ParseProvisionLogs.new
-      pattern_spec = deploy_parser.pattern_spec
+      pattern_spec = deploy_parser.get_pattern_for_node(node['cobbler']['profile'])
       date_regexp = '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
       date_format = '%Y-%m-%dT%H:%M:%S'
 
@@ -124,9 +124,9 @@ describe LogParser do
         # Create temp log files and structures.
         pattern_spec['path_prefix'] = "#{dir}/"
         path = "#{pattern_spec['path_prefix']}#{node['fqdn']}/#{pattern_spec['filename']}"
-        Dir.mkdir(File.dirname(File.dirname(path)))
-        Dir.mkdir(File.dirname(path))
+        FileUtils.mkdir_p(File.dirname(path))
         node['file'] = File.open(path, 'w')
+        Astute::LogParser::PATH_PREFIX.replace(pattern_spec['path_prefix'])
         src_filename = File.join(File.dirname(__FILE__), "..", "example-logs", node['src_filename'])
         node['src'] = File.open(src_filename)
         line, date = get_next_line(node['src'], date_regexp, date_format)
@@ -161,14 +161,15 @@ describe LogParser do
     end
 
     it "should be greather than 0.96" do
-      node = {'uid' => '1', 'ip' => '1.0.0.1', 'fqdn' => 'slave-1.domain.tld', 'role' => 'controller', 'src_filename' => 'anaconda.log_',
-        'meta' => { 'disks' =>
-          [
-          {'name' => 'flash drive', 'removable' => true, 'size' => 1000},
-          {'name' => 'sda', 'removable'=> false, 'size' => 32*1000*1000*1000},
-          ]
-        }
-      }
+      node = {
+        'uid' => '1',
+        'ip' => '1.0.0.1',
+        'fqdn' => 'slave-1.domain.tld',
+        'role' => 'controller',
+        'src_filename' => 'anaconda.log_',
+        'cobbler' => {
+          'profile' => 'centos-x86_64'}}
+
       calculated_node = provision_parser_wrapper(node)
       calculated_node['statistics']['pcc'].should > 0.96
     end
@@ -183,17 +184,19 @@ describe LogParser do
     def deployment_parser_wrapper(cluster_type, nodes)
       uids = nodes.map{|n| n['uid']}
 
-      deploy_parser = Astute::LogParser::ParseDeployLogs.new(cluster_type)
-      pattern_spec = deploy_parser.pattern_spec
+      deploy_parser = Astute::LogParser::ParseDeployLogs.new
+      deploy_parser.deploy_type = cluster_type
       date_regexp = '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
       date_format = '%Y-%m-%dT%H:%M:%S'
 
       Dir.mktmpdir do |dir|
         # Create temp log files and structures.
-        pattern_spec['path_prefix'] = "#{dir}/"
         nodes.each do |node|
+          pattern_spec = deploy_parser.get_pattern_for_node(node['role'])
+          pattern_spec['path_prefix'] = "#{dir}/"
+          Astute::LogParser::PATH_PREFIX.replace(pattern_spec['path_prefix'])
           path = "#{pattern_spec['path_prefix']}#{node['fqdn']}/#{pattern_spec['filename']}"
-          Dir.mkdir(File.dirname(path))
+          Dir.mkdir(File.dirname(path)) unless File.exists?(File.dirname(path))
           node['file'] = File.open(path, 'w')
           src_filename = File.join(File.dirname(__FILE__), "..", "example-logs", node['src_filename'])
           node['src'] = File.open(src_filename)
