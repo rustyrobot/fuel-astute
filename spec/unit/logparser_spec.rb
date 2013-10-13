@@ -114,19 +114,18 @@ describe LogParser do
       nodes = [node]
       time_delta = 5.0/24/60/60
       log_delay = 6*time_delta
-
-      deploy_parser = Astute::LogParser::ParseProvisionLogs.new
-      pattern_spec = deploy_parser.get_pattern_for_node(node['cobbler']['profile'])
       date_regexp = '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
       date_format = '%Y-%m-%dT%H:%M:%S'
 
       Dir.mktmpdir do |dir|
+        Astute::LogParser::PATH_PREFIX.replace("#{dir}/")
+        deploy_parser = Astute::LogParser::ParseProvisionLogs.new
+        pattern_spec = deploy_parser.get_pattern_for_node(node)
         # Create temp log files and structures.
-        pattern_spec['path_prefix'] = "#{dir}/"
         path = "#{pattern_spec['path_prefix']}#{node['fqdn']}/#{pattern_spec['filename']}"
+
         FileUtils.mkdir_p(File.dirname(path))
         node['file'] = File.open(path, 'w')
-        Astute::LogParser::PATH_PREFIX.replace(pattern_spec['path_prefix'])
         src_filename = File.join(File.dirname(__FILE__), "..", "example-logs", node['src_filename'])
         node['src'] = File.open(src_filename)
         line, date = get_next_line(node['src'], date_regexp, date_format)
@@ -173,28 +172,23 @@ describe LogParser do
       calculated_node = provision_parser_wrapper(node)
       calculated_node['statistics']['pcc'].should > 0.96
     end
-
-    it "it must be updated at least 5 times" do
-      # Otherwise progress bar has no meaning I guess...
-      pending('Not yet implemented')
-    end
-
   end
+
   context "Correlation coeff. (PCC) of Deploying progress bar calculation" do
     def deployment_parser_wrapper(cluster_type, nodes)
       uids = nodes.map{|n| n['uid']}
-
-      deploy_parser = Astute::LogParser::ParseDeployLogs.new
-      deploy_parser.deploy_type = cluster_type
       date_regexp = '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
       date_format = '%Y-%m-%dT%H:%M:%S'
 
       Dir.mktmpdir do |dir|
+        Astute::LogParser::PATH_PREFIX.replace("#{dir}/")
+        deploy_parser = Astute::LogParser::ParseDeployLogs.new
+        deploy_parser.deploy_type = cluster_type
+
         # Create temp log files and structures.
         nodes.each do |node|
-          pattern_spec = deploy_parser.get_pattern_for_node(node['role'])
-          pattern_spec['path_prefix'] = "#{dir}/"
-          Astute::LogParser::PATH_PREFIX.replace(pattern_spec['path_prefix'])
+          pattern_spec = deploy_parser.get_pattern_for_node(node)
+
           path = "#{pattern_spec['path_prefix']}#{node['fqdn']}/#{pattern_spec['filename']}"
           Dir.mkdir(File.dirname(path)) unless File.exists?(File.dirname(path))
           node['file'] = File.open(path, 'w')
@@ -250,12 +244,6 @@ describe LogParser do
 
       calculated_nodes = deployment_parser_wrapper('ha', nodes)
       calculated_nodes.each {|node| node['statistics']['pcc'].should > 0.85}
-
-      # For debug purposes.
-      # print "\n"
-      # calculated_nodes.each do |node|
-      #   print node['statistics'].inspect, "\n", node['statistics']['pcc'], "\n", node['progress_table'][-1][:progress], "\n"
-      # end
     end
 
     it "should be greather than 0.97 for singlenode deployment" do

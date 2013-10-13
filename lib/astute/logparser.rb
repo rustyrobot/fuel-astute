@@ -129,19 +129,21 @@ module Astute
       attr_reader :pattern_spec
 
       def initialize
-        @nodes_patterns = {}
         @pattern_spec = {}
         @pattern_spec['path_prefix'] ||= PATH_PREFIX.to_s
         @pattern_spec['separator'] ||= SEPARATOR.to_s
+        @nodes_patterns = {}
       end
 
       def progress_calculate(uids_to_calc, nodes)
         nodes_progress = []
 
+        patterns = patterns_for_nodes(nodes, uids_to_calc)
         uids_to_calc.each do |uid|
           node = nodes.find {|n| n['uid'] == uid}
+          @nodes_patterns[uid] ||= patterns[uid]
           node_pattern_spec = @nodes_patterns[uid]
-          # FIXME(eli): this crap is required for binding() below
+          # FIXME(eli): this var is required for binding() below
           @pattern_spec = @nodes_patterns[uid]
 
           erb_path = node_pattern_spec['path_format']
@@ -166,11 +168,27 @@ module Astute
       end
 
       def prepare(nodes)
-        # @nodes_patterns = {}
+        patterns = patterns_for_nodes(nodes)
         nodes.each do |node|
-          path = "#{@pattern_spec['path_prefix']}#{node['ip']}/#{@pattern_spec['filename']}"
-          File.open(path, 'a') {|fo| fo.write @pattern_spec['separator'] } if File.writable?(path)
+          pattern = patterns[node['uid']]
+          path = "#{pattern['path_prefix']}#{node['ip']}/#{pattern['filename']}"
+          File.open(path, 'a') { |fo| fo.write pattern['separator'] } if File.writable?(path)
         end
+      end
+
+      # Get patterns for selected nodes
+      # if uids_to_calc is nil, then
+      # patterns for all nodes will be returned
+      def patterns_for_nodes(nodes, uids_to_calc=nil)
+        uids_to_calc = nodes.map { |node| node['uid'] } if uids_to_calc.nil?
+        nodes_to_calc = nodes.select { |node| uids_to_calc.include?(node['uid']) }
+
+        patterns = {}
+        nodes_to_calc.map do |node|
+          patterns[node['uid']] = get_pattern_for_node(node)
+        end
+
+        patterns
       end
 
       private

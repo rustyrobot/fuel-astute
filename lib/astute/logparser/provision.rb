@@ -19,16 +19,8 @@ module Astute
   module LogParser
     class ParseProvisionLogs < ParseNodeLogs
 
-      def progress_calculate(uids_to_calc, nodes)
-        # Just create correct pattern for each node and then call parent method.
-        nodes.select { |node| uids_to_calc.include?(node['uid']) }.each do |node|
-          @nodes_patterns[node['uid']] ||= get_pattern_for_node(node['cobbler']['profile'])
-        end
-
-        super(uids_to_calc, nodes)
-      end
-
-      def get_pattern_for_node(os)
+      def get_pattern_for_node(node)
+        os = node['cobbler']['profile']
         if ['rhel-x86_64', 'centos-x86_64'].include?(os)
           pattern_spec_name = 'centos-anaconda-log-supposed-time-kvm'
         elsif os == 'ubuntu_1204_x86_64'
@@ -37,7 +29,7 @@ module Astute
           raise Astute::ParseProvisionLogsError, "Cannot find profile for os with: #{os}"
         end
 
-        pattern_spec = Patterns::get_default_pattern(pattern_spec_name)
+        pattern_spec = deep_copy(Patterns::get_default_pattern(pattern_spec_name))
         pattern_spec['path_prefix'] ||= PATH_PREFIX.to_s
         pattern_spec['separator'] ||= SEPARATOR.to_s
 

@@ -23,18 +23,8 @@ module Astute
         @nodes_patterns = {}
       end
 
-      def progress_calculate(uids_to_calc, nodes)
-        # Just create correct pattern for each node and then call parent method.
-        uids_to_calc.each do |uid|
-          node = nodes.find {|n| n['uid'] == uid}
-          unless @nodes_patterns[uid]
-            @nodes_patterns[uid] = get_pattern_for_node(node['role'])
-          end
-        end
-        super(uids_to_calc, nodes)
-      end
-
-      def get_pattern_for_node(role)
+      def get_pattern_for_node(node)
+        role = node['role']
         node_pattern = Patterns::get_default_pattern(
           "puppet-log-components-list-#{@deploy_type}-#{role}")
         node_pattern['path_prefix'] ||= PATH_PREFIX.to_s
