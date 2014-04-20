@@ -31,8 +31,7 @@ module Astute
 
         dump_cmd = "/opt/nailgun/bin/shotgun -c #{config_path} >> /var/log/dump.log 2>&1 && cat #{lastdump}"
         Astute.logger.debug("Try to execute command: #{dump_cmd}")
-
-        result = shell.execute(:cmd => dump_cmd).first
+        result = shell.execute(:cmd => dump_cmd).first.results
 
         Astute.logger.debug("#{ctx.task_id}: \
 stdout: #{result[:data][:stdout]} stderr: #{result[:data][:stderr]} \
