@@ -89,7 +89,7 @@ module Astute
       super
       @actions = [
         UpdateNoQuorumPolicy.new,
-        # UploadCirrosImage.new,
+        UploadCirrosImage.new,
         RestartRadosgw.new,
         UpdateClusterHostsInfo.new
       ]
