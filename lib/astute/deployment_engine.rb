@@ -171,16 +171,13 @@ module Astute
       PUPPET_CMD
       shell_command.tr!("\n"," ")
 
-      perform_with_limit(hook['uids']).each do |node_uids|
-        response = run_shell_command(
-          @ctx,
-          node_uids,
-          shell_command,
-          timeout
-        )
-        if response[:data][:exit_code] != 0
-          Astute.logger.warn("Puppet run failed. Check puppet logs for details")
-        end
+      response = run_shell_command(
+        @ctx,
+        hook['uids'],
+        shell_command,
+        timeout)
+      if response[:data][:exit_code] != 0
+        Astute.logger.warn("Puppet run failed. Check puppet logs for details")
       end
     end #puppet_hook
 
@@ -196,19 +193,16 @@ module Astute
       group_owner = hook['parameters']['group_owner'] || 'root'
       dir_permissions = hook['parameters']['dir_permissions'] || '0755'
 
-      perform_with_limit(hook['uids']).each do |node_uids|
-        upload_mclient = Astute::MClient.new(@ctx, "uploadfile", node_uids)
-        upload_mclient.upload(
-          :path => hook['parameters']['path'],
-          :content => hook['parameters']['data'],
-          :overwrite => overwrite,
-          :parents => parents,
-          :permissions => permissions,
-          :user_owner => user_owner,
-          :group_owner => group_owner,
-          :dir_permissions => dir_permissions
-        )
-      end
+      upload_mclient = Astute::MClient.new(@ctx, "uploadfile", hook['uids'])
+      upload_mclient.upload(
+        :path => hook['parameters']['path'],
+        :content => hook['parameters']['data'],
+        :overwrite => overwrite,
+        :parents => parents,
+        :permissions => permissions,
+        :user_owner => user_owner,
+        :group_owner => group_owner,
+        :dir_permissions => dir_permissions)
     end
 
     def shell_hook(hook)
@@ -219,18 +213,15 @@ module Astute
       timeout = hook['parameters']['timeout'] || 300
       cwd = hook['parameters']['cwd'] || "~/"
 
-      shell_command = "cd #{cwd} && #{hook['cmd']}"
+      shell_command = "cd #{cwd} && #{hook['parameters']['cmd']}"
 
-      perform_with_limit(hook['uids']).each do |node_uids|
-        response = run_shell_command(
-          @ctx,
-          node_uids,
-          shell_command,
-          timeout
-        )
-        if response[:data][:exit_code] != 0
-          Astute.logger.warn("Shell command failed. Check debug output for details")
-        end
+      response = run_shell_command(
+        @ctx,
+        hook['uids'],
+        shell_command,
+        timeout)
+      if response[:data][:exit_code] != 0
+        Astute.logger.warn("Shell command failed. Check debug output for details")
       end
     end # shell_hook
 
@@ -248,19 +239,16 @@ module Astute
       rsync_options = '-c -r --delete'
       rsync_cmd = "mkdir -p #{path} && rsync #{rsync_options} #{source} #{path}"
 
-      perform_with_limit(hook['uids']).each do |node_uids|
-        sync_retries = 0
-        while sync_retries < 10
-          sync_retries += 1
-          response = run_shell_command(
-            @ctx,
-            node_uids,
-            rsync_cmd,
-            timeout
-          )
-          break if response[:data][:exit_code] == 0
-          Astute.logger.warn("Rsync problem. Try to repeat: #{sync_retries} attempt")
-        end
+      sync_retries = 0
+      while sync_retries < 10
+        sync_retries += 1
+        response = run_shell_command(
+          @ctx,
+          hook['uids'],
+          rsync_cmd,
+          timeout)
+        break if response[:data][:exit_code] == 0
+        Astute.logger.warn("Rsync problem. Try to repeat: #{sync_retries} attempt")
       end
     end # sync_hook
 
